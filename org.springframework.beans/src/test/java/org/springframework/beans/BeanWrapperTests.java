@@ -49,6 +49,9 @@ import org.springframework.beans.propertyeditors.CustomNumberEditor;
 import org.springframework.beans.propertyeditors.StringArrayPropertyEditor;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
 import org.springframework.beans.support.DerivedFromProtectedBaseBean;
+import org.springframework.core.OverridingClassLoader;
+import org.springframework.core.io.DefaultResourceLoader;
+import org.springframework.core.io.UrlResource;
 import org.springframework.util.StopWatch;
 import org.springframework.util.StringUtils;
 
@@ -60,6 +63,60 @@ import org.springframework.util.StringUtils;
  * @author Chris Beams
  */
 public final class BeanWrapperTests {
+
+	public void TestPropertyDescriptors() throws Exception {
+		TestBean target = new TestBean();
+		target.setSpouse(new TestBean());
+		BeanWrapper accessor = new BeanWrapperImpl(target);
+		accessor.setPropertyValue("name", "a");
+		accessor.setPropertyValue("spouse.name", "b");
+
+		assertEquals(target.getName(), "a");
+		assertEquals(target.getSpouse().getName(), "b");
+		assertEquals(accessor.getPropertyValue("name"), "a");
+		assertEquals(accessor.getPropertyValue("spouse.name"), "b");
+		assertEquals(accessor.getPropertyDescriptor("name").getPropertyType(), String.class);
+		assertEquals(accessor.getPropertyDescriptor("spouse.name").getPropertyType(), String.class);
+
+		assertFalse(accessor.isReadableProperty("class.package"));
+		assertFalse(accessor.isReadableProperty("class.module"));
+		assertFalse(accessor.isReadableProperty("class.classLoader"));
+		assertTrue(accessor.isReadableProperty("class.name"));
+		assertTrue(accessor.isReadableProperty("class.simpleName"));
+		assertEquals(accessor.getPropertyValue("class.name"), TestBean.class.getName());
+		assertEquals(accessor.getPropertyValue("class.simpleName"), TestBean.class.getSimpleName());
+		assertEquals(accessor.getPropertyDescriptor("class.name").getPropertyType(), String.class);
+		assertEquals(accessor.getPropertyDescriptor("class.simpleName").getPropertyType(), String.class);
+
+		accessor = new BeanWrapperImpl(new DefaultResourceLoader());
+
+		assertFalse(accessor.isReadableProperty("class.package"));
+		assertFalse(accessor.isReadableProperty("class.module"));
+		assertFalse(accessor.isReadableProperty("class.classLoader"));
+		assertTrue(accessor.isReadableProperty("class.name"));
+		assertTrue(accessor.isReadableProperty("class.simpleName"));
+		assertTrue(accessor.isReadableProperty("classLoader"));
+		assertTrue(accessor.isWritableProperty("classLoader"));
+		OverridingClassLoader ocl = new OverridingClassLoader(getClass().getClassLoader());
+		accessor.setPropertyValue("classLoader", ocl);
+		assertSame(accessor.getPropertyValue("classLoader"), ocl);
+
+		accessor = new BeanWrapperImpl(new UrlResource("https://spring.io"));
+
+		assertFalse(accessor.isReadableProperty("class.package"));
+		assertFalse(accessor.isReadableProperty("class.module"));
+		assertFalse(accessor.isReadableProperty("class.classLoader"));
+		assertTrue(accessor.isReadableProperty("class.name"));
+		assertTrue(accessor.isReadableProperty("class.simpleName"));
+		assertTrue(accessor.isReadableProperty("URL.protocol"));
+		assertTrue(accessor.isReadableProperty("URL.host"));
+		assertTrue(accessor.isReadableProperty("URL.port"));
+		assertTrue(accessor.isReadableProperty("URL.file"));
+		assertFalse(accessor.isReadableProperty("URL.content"));
+		assertFalse(accessor.isReadableProperty("inputStream"));
+		assertTrue(accessor.isReadableProperty("filename"));
+		assertTrue(accessor.isReadableProperty("description"));
+	}
 
 	@Test
 	public void testIsReadablePropertyNotReadable() {
